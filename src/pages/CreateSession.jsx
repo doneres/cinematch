@@ -51,7 +51,7 @@ export default function CreateSession() {
 
       // Add custom films
       const customFilms = Object.entries(filmMeta)
-        .filter(([, m]) => m.custom && !films.some((f) => f.id === id))
+        .filter(([id, m]) => m.custom && !films.some((f) => f.id === id))
         .map(([id, m]) => ({ id, name: m.name, watched: m.watched ?? false }))
       films = [...films, ...customFilms]
 

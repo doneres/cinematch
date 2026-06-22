@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -7,6 +7,8 @@ import {
 } from 'lucide-react'
 import Logo from '../components/Logo'
 import FilmDetailModal from '../components/FilmDetailModal'
+import FilmManagerLock from '../components/FilmManagerLock'
+import FilmPoster from '../components/FilmPoster'
 import { fetchFilmList, searchFilms, getFilmDetails } from '../lib/omdb'
 import { subscribeToFilmMeta, setWatched, addCustomFilm, removeCustomFilm } from '../lib/filmStore'
 
@@ -14,6 +16,7 @@ const FILTERS = ['todos', 'assistidos', 'não assistidos']
 
 export default function FilmManager() {
   const navigate = useNavigate()
+  const [unlocked, setUnlocked] = useState(false)
   const [baseFilms, setBaseFilms] = useState([])   // from JSON
   const [filmMeta, setFilmMeta] = useState({})      // from Firestore
   const [omdbCache, setOmdbCache] = useState({})
@@ -110,6 +113,8 @@ export default function FilmManager() {
 
   const watchedCount = allFilms.filter((f) => f.watched).length
 
+  if (!unlocked) return <FilmManagerLock onUnlock={() => setUnlocked(true)} />
+
   return (
     <div className="min-h-dvh bg-[#080810] flex flex-col">
       {/* Header */}
@@ -205,16 +210,15 @@ export default function FilmManager() {
               >
                 {/* Poster */}
                 <button
-                  onClick={() => omdb && setDetailFilm({ omdb })}
-                  className="w-12 h-16 rounded-lg overflow-hidden bg-white/5 shrink-0 relative"
+                  onClick={() => omdb && setDetailFilm({ omdb, filmId: film.id })}
+                  className="w-12 h-16 rounded-lg overflow-hidden shrink-0 relative"
                 >
-                  {poster ? (
-                    <img src={poster} alt={film.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Film size={18} className="text-gray-600" />
-                    </div>
-                  )}
+                  <FilmPoster
+                    src={poster}
+                    title={omdb?.Title || film.name}
+                    imdbId={film.id}
+                    className="w-full h-full"
+                  />
                   {film.watched && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                       <Check size={16} className="text-emerald-400" />
@@ -225,7 +229,7 @@ export default function FilmManager() {
                 {/* Info */}
                 <button
                   className="flex-1 text-left min-w-0"
-                  onClick={() => omdb && setDetailFilm({ omdb })}
+                  onClick={() => omdb && setDetailFilm({ omdb, filmId: film.id })}
                 >
                   <p className="text-white text-sm font-medium truncate">{omdb?.Title || film.name}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -352,6 +356,7 @@ export default function FilmManager() {
       {detailFilm && (
         <FilmDetailModal
           omdbData={detailFilm.omdb}
+          filmId={detailFilm.filmId}
           onClose={() => setDetailFilm(null)}
         />
       )}

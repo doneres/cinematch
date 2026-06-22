@@ -7,7 +7,7 @@ import Logo from '../components/Logo'
 import { subscribeToSession, recordVote } from '../lib/sessionService'
 import { getFilmDetails } from '../lib/omdb'
 import { getUserId, seededShuffle } from '../lib/utils'
-import { Users, Info } from 'lucide-react'
+import { Users, Info, Film } from 'lucide-react'
 
 export default function Swipe() {
   const { code } = useParams()
@@ -25,9 +25,9 @@ export default function Swipe() {
     if (!code) return
     const unsub = subscribeToSession(code, (data) => {
       setSession(data)
-      if (data.status === 'completed' && data.matchedFilm) {
-        navigate(`/match/${code}`)
-      }
+      if (data.status === 'completed' && data.matchedFilm) navigate(`/match/${code}`)
+      if (data.status === 'watching') navigate(`/watch/${code}`)
+      if (data.status === 'reviewing' || data.status === 'finished') navigate(`/review/${code}`)
     })
     return unsub
   }, [code])
@@ -71,7 +71,7 @@ export default function Swipe() {
   if (done) {
     return (
       <div className="page-swipe items-center justify-center px-4 gap-4 bg-[#080810]">
-        <div className="text-5xl">😴</div>
+        <Film size={48} className="text-gray-700" />
         <h2 className="text-white text-xl font-bold text-center">Você viu todos os filmes!</h2>
         <p className="text-gray-400 text-sm text-center">Aguardando os outros participantes…</p>
         <div className="flex items-center gap-2 text-amber-400 text-sm mt-2">
@@ -123,7 +123,7 @@ export default function Swipe() {
               className="w-full"
             >
               <SwipeCard
-                film={{ id: currentFilmId, name: currentOmdb?.Title || film?.name || '', rating: 0 }}
+                film={{ id: currentFilmId, name: currentOmdb?.Title || '', rating: 0 }}
                 omdbData={currentOmdb}
                 onSwipe={handleSwipe}
                 isTop={true}
