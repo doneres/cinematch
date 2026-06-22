@@ -2,6 +2,15 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Home, Play, Star, Clock, Calendar, User, Video, Award, Loader2 } from 'lucide-react'
+
+const COLORS = ['#f5c518', '#e53e3e', '#48bb78', '#9f7aea', '#ed8936', '#f5c518', '#38bdf8']
+const CONFETTI = Array.from({ length: 22 }, (_, i) => ({
+  x: (i / 22) * 100 + (Math.random() * 8 - 4),
+  rot: 120 + Math.random() * 480,
+  dur: 1.8 + Math.random() * 1.8,
+  delay: Math.random() * 2,
+  color: COLORS[i % COLORS.length],
+}))
 import Logo from '../components/Logo'
 import FilmPoster from '../components/FilmPoster'
 import { subscribeToSession } from '../lib/sessionService'
@@ -20,6 +29,7 @@ export default function Match() {
   useEffect(() => {
     const unsub = subscribeToSession(code, (data) => {
       setSession(data)
+      if (data.status === 'cancelled') { navigate('/'); return }
       if (data.status === 'watching') navigate(`/watch/${code}`)
       if (data.status === 'reviewing' || data.status === 'finished') navigate(`/review/${code}`)
     })
@@ -50,16 +60,16 @@ export default function Match() {
 
   return (
     <div className="flex-1 flex flex-col items-center px-4 py-8 overflow-y-auto">
-      {/* Confetti */}
+      {/* Confetti — uses % so it stays within the app shell on desktop */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        {Array.from({ length: 18 }).map((_, i) => (
+        {CONFETTI.map((c, i) => (
           <motion.div
             key={i}
-            initial={{ y: -20, x: `${Math.random() * 100}vw`, opacity: 1 }}
-            animate={{ y: '110vh', opacity: 0, rotate: Math.random() * 360 }}
-            transition={{ duration: 2 + Math.random() * 2, delay: Math.random() * 1.5, repeat: Infinity }}
+            initial={{ y: -20, x: `${c.x}%`, opacity: 1, rotate: 0 }}
+            animate={{ y: '105%', opacity: [1, 1, 0], rotate: c.rot }}
+            transition={{ duration: c.dur, delay: c.delay, repeat: Infinity, ease: 'linear' }}
             className="absolute w-2.5 h-2.5 rounded-sm"
-            style={{ backgroundColor: ['#f5c518', '#e53e3e', '#48bb78', '#9f7aea', '#ed8936'][i % 5] }}
+            style={{ backgroundColor: c.color }}
           />
         ))}
       </div>

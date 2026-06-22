@@ -24,9 +24,8 @@ export default function WatchSession() {
   useEffect(() => {
     const unsub = subscribeToSession(code, (data) => {
       setSession(data)
-      if (data.status === 'reviewing' || data.status === 'finished') {
-        navigate(`/review/${code}`)
-      }
+      if (data.status === 'cancelled') { navigate('/'); return }
+      if (data.status === 'reviewing' || data.status === 'finished') navigate(`/review/${code}`)
       if (data.status === 'active') navigate(`/swipe/${code}`)
     })
     return unsub

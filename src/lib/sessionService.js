@@ -3,6 +3,7 @@ import {
   setDoc,
   getDoc,
   updateDoc,
+  deleteField,
   onSnapshot,
   serverTimestamp,
   Timestamp,
@@ -158,6 +159,29 @@ export async function submitReview(code, userId, { rating, comment, userName, ma
       await setWatched(matchedFilmId, true).catch(() => {})
     }
   }
+}
+
+export async function kickParticipant(code, userId) {
+  await updateDoc(doc(db, 'sessions', code), {
+    [`participants.${userId}`]: deleteField(),
+    [`votes`]: deleteField(), // reset votes to avoid match with ghost participants
+  })
+}
+
+export async function renameParticipant(code, userId, newName) {
+  await updateDoc(doc(db, 'sessions', code), {
+    [`participants.${userId}.name`]: newName.trim(),
+  })
+}
+
+export async function cancelSession(code) {
+  await updateDoc(doc(db, 'sessions', code), { status: 'cancelled' })
+}
+
+export async function updateHeartbeat(code, userId) {
+  await updateDoc(doc(db, 'sessions', code), {
+    [`participants.${userId}.lastSeen`]: serverTimestamp(),
+  })
 }
 
 export function subscribeToMessages(code, callback) {

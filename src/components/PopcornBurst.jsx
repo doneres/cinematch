@@ -23,13 +23,16 @@ function generateKernels(count = 20) {
   })
 }
 
+// active is a counter — fires a new burst each time it increments
 export default function PopcornBurst({ active }) {
   const [visible, setVisible] = useState(false)
   const [kernels, setKernels] = useState([])
   const timerRef = useRef(null)
+  const prevRef = useRef(0)
 
   useEffect(() => {
-    if (!active) return
+    if (active === 0 || active === prevRef.current) return
+    prevRef.current = active
     setKernels(generateKernels(20))
     setVisible(true)
     clearTimeout(timerRef.current)

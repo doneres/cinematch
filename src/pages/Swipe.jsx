@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import SwipeCard from '../components/SwipeCard'
 import FilmDetailModal from '../components/FilmDetailModal'
 import Logo from '../components/Logo'
-import { subscribeToSession, recordVote } from '../lib/sessionService'
+import { subscribeToSession, recordVote, updateHeartbeat } from '../lib/sessionService'
 import { getFilmDetails } from '../lib/omdb'
 import { getUserId, seededShuffle } from '../lib/utils'
 import { Users, Info, Film } from 'lucide-react'
@@ -22,18 +22,39 @@ export default function Swipe() {
   const [omdbCache, setOmdbCache] = useState({})
   const [done, setDone] = useState(false)
   const [detailFilm, setDetailFilm] = useState(null)
-  const [popcorn, setPopcorn] = useState(false)
+  const [popcorn, setPopcorn] = useState(0)   // counter: increment on each like
+  const [swiping, setSwiping] = useState(false) // lock to prevent rapid clicks
+  const [kicked, setKicked] = useState(false)
+  const heartbeatRef = useRef(null)
 
   useEffect(() => {
     if (!code) return
     const unsub = subscribeToSession(code, (data) => {
       setSession(data)
+
+      // Detect if we were kicked from the session
+      if (data.participants && !data.participants[userId]) {
+        setKicked(true)
+        return
+      }
+
+      if (data.status === 'cancelled') { navigate('/'); return }
       if (data.status === 'completed' && data.matchedFilm) navigate(`/match/${code}`)
       if (data.status === 'watching') navigate(`/watch/${code}`)
       if (data.status === 'reviewing' || data.status === 'finished') navigate(`/review/${code}`)
     })
     return unsub
   }, [code])
+
+  // Heartbeat: update lastSeen every 30s so host can detect inactive users
+  useEffect(() => {
+    if (!code || !userId) return
+    updateHeartbeat(code, userId).catch(() => {})
+    heartbeatRef.current = setInterval(() => {
+      updateHeartbeat(code, userId).catch(() => {})
+    }, 30_000)
+    return () => clearInterval(heartbeatRef.current)
+  }, [code, userId])
 
   useEffect(() => {
     if (!session?.filmIds) return
@@ -52,18 +73,27 @@ export default function Swipe() {
   }, [currentIndex, filmOrder])
 
   async function handleSwipe(direction) {
+    if (swiping) return
     const filmId = filmOrder[currentIndex]
-    if (!filmId) return
-    if (direction === 'like') setPopcorn((v) => !v)
+    if (!filmId) { setDone(true); return }
+
+    setSwiping(true)
+    if (direction === 'like') setPopcorn((n) => n + 1)
+
     try {
       const result = await recordVote({ code, userId, filmId, liked: direction === 'like' })
       if (result.matched) { navigate(`/match/${code}`); return }
     } catch (err) {
       console.error(err)
     }
+
     const next = currentIndex + 1
-    if (next >= filmOrder.length) setDone(true)
-    else setCurrentIndex(next)
+    if (next >= filmOrder.length) {
+      setDone(true)
+    } else {
+      setCurrentIndex(next)
+    }
+    setSwiping(false)
   }
 
   const currentFilmId = filmOrder[currentIndex]
@@ -71,6 +101,23 @@ export default function Swipe() {
   const nextFilmId = filmOrder[currentIndex + 1]
   const participantCount = Object.keys(session?.participants || {}).length
   const progress = filmOrder.length > 0 ? (currentIndex / filmOrder.length) * 100 : 0
+
+  // Kicked screen
+  if (kicked) {
+    return (
+      <div className="page-swipe items-center justify-center px-4 gap-4 bg-[#080810]">
+        <div className="text-4xl">🚪</div>
+        <h2 className="text-white text-xl font-bold text-center">Você foi removido</h2>
+        <p className="text-gray-400 text-sm text-center">O anfitrião removeu você desta sessão.</p>
+        <button
+          onClick={() => navigate('/')}
+          className="mt-4 px-6 py-3 rounded-2xl bg-amber-400 text-black font-bold active:scale-95 transition-transform"
+        >
+          Voltar ao início
+        </button>
+      </div>
+    )
+  }
 
   if (done) {
     return (
@@ -87,64 +134,76 @@ export default function Swipe() {
   }
 
   return (
-    <div className="page-swipe bg-[#080810] px-4">
-      {/* Header */}
-      <div className="flex items-center justify-between pt-4 pb-2 shrink-0">
-        <Logo size="sm" />
-        <div className="flex items-center gap-3 text-right">
-          <span className="text-gray-500 text-xs">{currentIndex + 1}/{filmOrder.length}</span>
-          <span className="flex items-center gap-1 text-gray-500 text-xs">
-            <Users size={12} />
-            {participantCount}
-          </span>
-        </div>
-      </div>
-
-      {/* Progress */}
-      <div className="h-0.5 w-full bg-white/5 rounded-full mb-3 shrink-0">
-        <div
-          className="h-full bg-amber-400/70 rounded-full transition-all duration-300"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-
-      {/* Card area */}
-      <div className="flex-1 min-h-0 flex flex-col items-center justify-center relative">
-        {/* Background (next card hint) */}
-        {nextFilmId && (
-          <div className="absolute inset-x-0 top-3 mx-auto w-full opacity-30 scale-[0.96] pointer-events-none">
-            <div className="rounded-2xl bg-[#12121f] border border-white/5" style={{ height: 'clamp(260px, 55dvh, 460px)' }} />
+    <>
+      <div className="page-swipe bg-[#080810] px-4">
+        {/* Header */}
+        <div className="flex items-center justify-between pt-4 pb-2 shrink-0">
+          <Logo size="sm" />
+          <div className="flex items-center gap-3 text-right">
+            <span className="text-gray-500 text-xs">{currentIndex + 1}/{filmOrder.length}</span>
+            <span className="flex items-center gap-1 text-gray-500 text-xs">
+              <Users size={12} />
+              {participantCount}
+            </span>
           </div>
-        )}
+        </div>
 
-        <AnimatePresence mode="wait">
-          {currentFilmId && (
-            <motion.div
-              key={currentFilmId}
-              initial={{ opacity: 0, scale: 0.92 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.18 }}
-              className="w-full"
-            >
-              <SwipeCard
-                film={{ id: currentFilmId, name: currentOmdb?.Title || '', rating: 0 }}
-                omdbData={currentOmdb}
-                onSwipe={handleSwipe}
-                isTop={true}
-                onDetail={() => setDetailFilm({ id: currentFilmId, omdb: currentOmdb })}
-              />
-            </motion.div>
+        {/* Progress */}
+        <div className="h-0.5 w-full bg-white/5 rounded-full mb-3 shrink-0">
+          <div
+            className="h-full bg-amber-400/70 rounded-full transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
+        {/* Card area */}
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center relative">
+          {nextFilmId && (
+            <div className="absolute inset-x-0 top-3 mx-auto w-full opacity-30 scale-[0.96] pointer-events-none">
+              <div className="rounded-2xl bg-[#12121f] border border-white/5" style={{ height: 'clamp(260px, 55dvh, 460px)' }} />
+            </div>
           )}
-        </AnimatePresence>
+
+          <AnimatePresence mode="wait">
+            {currentFilmId && (
+              <motion.div
+                key={currentFilmId}
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.18 }}
+                className="w-full"
+              >
+                <SwipeCard
+                  film={{ id: currentFilmId, name: currentOmdb?.Title || '', rating: 0 }}
+                  omdbData={currentOmdb}
+                  onSwipe={handleSwipe}
+                  disabled={swiping}
+                  isTop={true}
+                  onDetail={() => setDetailFilm({ id: currentFilmId, omdb: currentOmdb })}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Hint */}
+        <p className="text-gray-700 text-xs text-center py-3 shrink-0">
+          Arraste → curtir · ← passar · toque em <Info size={11} className="inline" /> para detalhes
+        </p>
+
+        {/* Film detail modal inside page-swipe (it manages its own fixed overlay) */}
+        {detailFilm && (
+          <FilmDetailModal
+            omdbData={detailFilm.omdb}
+            onClose={() => setDetailFilm(null)}
+            onLike={() => { setDetailFilm(null); handleSwipe('like') }}
+            onNope={() => { setDetailFilm(null); handleSwipe('nope') }}
+          />
+        )}
       </div>
 
-      {/* Hint */}
-      <p className="text-gray-700 text-xs text-center py-3 shrink-0">
-        Arraste → curtir · ← passar · toque em <Info size={11} className="inline" /> para detalhes
-      </p>
-
+      {/* These live outside page-swipe so they're not clipped by overflow:hidden */}
       <PopcornBurst active={popcorn} />
-
       {session && (
         <ChatDrawer
           code={code}
@@ -152,16 +211,6 @@ export default function Swipe() {
           participants={session.participants}
         />
       )}
-
-      {/* Film detail modal */}
-      {detailFilm && (
-        <FilmDetailModal
-          omdbData={detailFilm.omdb}
-          onClose={() => setDetailFilm(null)}
-          onLike={() => { setDetailFilm(null); handleSwipe('like') }}
-          onNope={() => { setDetailFilm(null); handleSwipe('nope') }}
-        />
-      )}
-    </div>
+    </>
   )
 }
