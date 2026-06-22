@@ -4,6 +4,7 @@ import {
   getDoc,
   updateDoc,
   deleteField,
+  increment,
   onSnapshot,
   serverTimestamp,
   Timestamp,
@@ -161,9 +162,12 @@ export async function submitReview(code, userId, { rating, comment, userName, ma
   }
 }
 
+export const SUPER_LIKE_LIMIT = 2
+
 export async function recordSuperLike(code, userId, userName, filmId) {
   await updateDoc(doc(db, 'sessions', code), {
     [`superLikes.${userId}`]: { filmId, userName, createdAt: serverTimestamp() },
+    [`superLikeCount.${userId}`]: increment(1), // atomic, server-side
   })
 }
 

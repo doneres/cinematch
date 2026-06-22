@@ -6,6 +6,7 @@ import FilmDetailModal from '../components/FilmDetailModal'
 import Logo from '../components/Logo'
 import {
   subscribeToSession, recordVote, recordSuperLike, updateHeartbeat,
+  SUPER_LIKE_LIMIT,
 } from '../lib/sessionService'
 import { getFilmDetails } from '../lib/omdb'
 import { getUserId, seededShuffle } from '../lib/utils'
@@ -61,34 +62,48 @@ export default function Swipe() {
     const votes = session.votes || {}
 
     Object.entries(session.superLikes).forEach(([fromUserId, sl]) => {
-      if (fromUserId === userId) return // ignore my own
+      if (fromUserId === userId) return
       const key = `${fromUserId}-${sl.filmId}`
       if (processedSuperLikesRef.current.has(key)) return
       processedSuperLikesRef.current.add(key)
 
       const filmId = sl.filmId
-      const hasVoted = votes[filmId]?.[userId] !== undefined
+      const hasVotedNope = votes[filmId]?.[userId] === false
+      const hasVotedLike = votes[filmId]?.[userId] === true
 
-      if (!hasVoted) {
-        // Move the super liked film to be the next card
-        setFilmOrder((prev) => {
-          const ci = currentIndexRef.current
-          const pos = prev.indexOf(filmId)
-          const target = ci + 1
-          if (pos < 0 || pos <= ci || pos === target) return prev
+      if (hasVotedLike) return // already liked, no need to show again
+
+      setFilmOrder((prev) => {
+        const ci = currentIndexRef.current
+        const pos = prev.indexOf(filmId)
+        const target = ci + 1
+
+        if (pos === target) return prev // already next
+
+        if (pos > ci) {
+          // Film still ahead — move it to be next
           const next = [...prev]
           next.splice(pos, 1)
           next.splice(target, 0, filmId)
           return next
-        })
+        }
 
-        // Show toast
-        clearTimeout(toastTimerRef.current)
-        const fromName = session.participants?.[fromUserId]?.name || sl.userName
-        const filmTitle = omdbCache[filmId]?.Title || 'um filme'
-        setToast({ fromName, filmTitle })
-        toastTimerRef.current = setTimeout(() => setToast(null), 4000)
-      }
+        // Film was already seen (user gave nope) — re-insert so they can reconsider
+        if (hasVotedNope) {
+          const next = [...prev]
+          next.splice(target, 0, filmId)
+          return next
+        }
+
+        return prev
+      })
+
+      // Toast notification
+      clearTimeout(toastTimerRef.current)
+      const fromName = session.participants?.[fromUserId]?.name || sl.userName
+      const filmTitle = omdbCache[filmId]?.Title || 'um filme'
+      setToast({ fromName, filmTitle })
+      toastTimerRef.current = setTimeout(() => setToast(null), 4000)
     })
   }, [session?.superLikes])
 
@@ -140,7 +155,7 @@ export default function Swipe() {
   }
 
   async function handleSuperLike() {
-    if (swiping) return
+    if (swiping || superLikesRemaining <= 0) return
     const filmId = filmOrder[currentIndex]
     if (!filmId) return
 
@@ -170,6 +185,8 @@ export default function Swipe() {
   const nextFilmId = filmOrder[currentIndex + 1]
   const participantCount = Object.keys(session?.participants || {}).length
   const progress = filmOrder.length > 0 ? (currentIndex / filmOrder.length) * 100 : 0
+  const superLikesUsed = session?.superLikeCount?.[userId] || 0
+  const superLikesRemaining = Math.max(0, SUPER_LIKE_LIMIT - superLikesUsed)
 
   // Check if current film has been super liked by someone else
   const superLikedBy = (() => {
@@ -274,6 +291,7 @@ export default function Swipe() {
                   disabled={swiping}
                   isTop={true}
                   superLikedBy={superLikedBy}
+                  superLikesRemaining={superLikesRemaining}
                   onDetail={() => setDetailFilm({ id: currentFilmId, omdb: currentOmdb })}
                 />
               </motion.div>

@@ -7,7 +7,7 @@ const SWIPE_UP_THRESHOLD = 80
 
 export default function SwipeCard({
   film, omdbData, onSwipe, onSuperLike, isTop, onDetail,
-  disabled = false, superLikedBy = null,
+  disabled = false, superLikedBy = null, superLikesRemaining = 0,
 }) {
   const x = useMotionValue(0)
   const y = useMotionValue(0)
@@ -161,14 +161,25 @@ export default function SwipeCard({
           {/* Super like — center, bigger, golden */}
           <button
             onClick={handleSuperLikeButton}
-            disabled={disabled}
-            className="relative flex items-center justify-center rounded-full bg-[#1a1a2e] border-2 border-amber-400/60 text-amber-400 hover:bg-amber-400/10 transition-all shadow-lg shadow-amber-400/20 active:scale-90 disabled:opacity-40"
-            style={{ width: 60, height: 60 }}
-            title="Super Like — recomenda para todos"
+            disabled={disabled || superLikesRemaining <= 0}
+            className="relative flex flex-col items-center justify-center rounded-full bg-[#1a1a2e] border-2 transition-all shadow-lg active:scale-90 disabled:opacity-40"
+            style={{
+              width: 60, height: 60,
+              borderColor: superLikesRemaining > 0 ? 'rgba(245,193,24,0.6)' : 'rgba(255,255,255,0.1)',
+              color: superLikesRemaining > 0 ? '#f5c118' : '#4b5563',
+              boxShadow: superLikesRemaining > 0 ? '0 8px 24px rgba(245,193,24,0.2)' : 'none',
+            }}
+            title={superLikesRemaining > 0
+              ? `Super Like — recomenda para todos (${superLikesRemaining} restante${superLikesRemaining !== 1 ? 's' : ''})`
+              : 'Super likes esgotados'}
           >
-            <Sparkles size={24} />
-            {/* Pulse ring */}
-            <span className="absolute inset-0 rounded-full border border-amber-400/30 animate-ping pointer-events-none" />
+            <Sparkles size={20} />
+            <span style={{ fontSize: 9, fontWeight: 700, lineHeight: 1, marginTop: 1 }}>
+              {superLikesRemaining > 0 ? superLikesRemaining : '✗'}
+            </span>
+            {superLikesRemaining > 0 && (
+              <span className="absolute inset-0 rounded-full border border-amber-400/25 animate-ping pointer-events-none" />
+            )}
           </button>
 
           {/* Like */}
