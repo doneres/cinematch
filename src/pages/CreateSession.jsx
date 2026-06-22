@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { ChevronLeft, Clapperboard, Loader2, AlertTriangle } from 'lucide-react'
 import Logo from '../components/Logo'
 import { fetchFilmList, getFilmDetails } from '../lib/omdb'
+import { getFilmMeta } from '../lib/filmStore'
 import { createSession } from '../lib/sessionService'
 import { getUserId } from '../lib/utils'
 
@@ -18,10 +20,7 @@ export default function CreateSession() {
   const [error, setError] = useState('')
 
   function toggleGenre(g) {
-    if (g === 'all') {
-      setGenres(['all'])
-      return
-    }
+    if (g === 'all') { setGenres(['all']); return }
     setGenres((prev) => {
       const without = prev.filter((x) => x !== 'all')
       if (without.includes(g)) {
@@ -40,14 +39,28 @@ export default function CreateSession() {
 
     try {
       setLoadingMsg('Carregando lista de filmes…')
-      const filmList = await fetchFilmList()
+      const [filmList, filmMeta] = await Promise.all([fetchFilmList(), getFilmMeta()])
 
-      // Filter by watched setting
-      let filtered = includeWatched ? filmList : filmList.filter((f) => !f.watched)
+      // Merge watched overrides from Firestore
+      let films = filmList
+        .filter((f) => f.id)
+        .map((f) => ({
+          ...f,
+          watched: filmMeta[f.id]?.watched ?? f.watched ?? false,
+        }))
 
-      // If genre filter is active, fetch details and filter
-      let filmIds = filtered.map((f) => f.id).filter(Boolean)
+      // Add custom films
+      const customFilms = Object.entries(filmMeta)
+        .filter(([, m]) => m.custom && !films.some((f) => f.id === id))
+        .map(([id, m]) => ({ id, name: m.name, watched: m.watched ?? false }))
+      films = [...films, ...customFilms]
 
+      // Filter watched
+      if (!includeWatched) films = films.filter((f) => !f.watched)
+
+      let filmIds = films.map((f) => f.id)
+
+      // Genre filter
       if (!genres.includes('all')) {
         setLoadingMsg(`Filtrando por gênero (0/${filmIds.length})…`)
         const matched = []
@@ -55,9 +68,7 @@ export default function CreateSession() {
           const details = await getFilmDetails(filmIds[i])
           if (details?.Genre) {
             const filmGenres = details.Genre.split(', ')
-            if (genres.some((g) => filmGenres.includes(g))) {
-              matched.push(filmIds[i])
-            }
+            if (genres.some((g) => filmGenres.includes(g))) matched.push(filmIds[i])
           }
           setLoadingMsg(`Filtrando por gênero (${i + 1}/${filmIds.length})…`)
         }
@@ -71,9 +82,8 @@ export default function CreateSession() {
       }
 
       setLoadingMsg('Criando sessão…')
-      const userId = getUserId()
       const code = await createSession({
-        hostId: userId,
+        hostId: getUserId(),
         hostName: name.trim(),
         settings: { genres, includeWatched, filmIds },
       })
@@ -87,30 +97,31 @@ export default function CreateSession() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080810] flex flex-col items-center px-4 py-8 relative">
-      <div className="absolute top-4 left-4">
-        <button onClick={() => navigate('/')} className="text-gray-500 hover:text-white transition-colors text-sm">
-          ← Voltar
+    <div className="min-h-dvh bg-[#080810] flex flex-col px-4 py-6">
+      <div className="flex items-center gap-3 mb-6">
+        <button
+          onClick={() => navigate('/')}
+          className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+        >
+          <ChevronLeft size={18} />
         </button>
+        <Logo size="sm" />
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-sm space-y-6 pt-8"
+        className="flex-1 max-w-sm w-full mx-auto"
       >
-        <Logo size="md" />
-
-        <h2 className="text-white text-2xl font-bold">Criar sessão</h2>
+        <h2 className="text-white text-2xl font-bold mb-6">Criar sessão</h2>
 
         {loading ? (
-          <div className="flex flex-col items-center gap-4 py-12">
-            <div className="w-12 h-12 border-4 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+          <div className="flex flex-col items-center gap-4 py-16">
+            <Loader2 size={36} className="text-amber-400 animate-spin" />
             <p className="text-gray-400 text-sm text-center">{loadingMsg}</p>
           </div>
         ) : (
           <form onSubmit={handleCreate} className="space-y-5">
-            {/* Name */}
             <div className="space-y-1.5">
               <label className="text-gray-400 text-sm">Seu nome</label>
               <input
@@ -123,7 +134,7 @@ export default function CreateSession() {
               />
             </div>
 
-            {/* Include watched */}
+            {/* Watched toggle */}
             <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/5 border border-white/10">
               <div>
                 <p className="text-white text-sm font-medium">Incluir já assistidos</p>
@@ -132,13 +143,9 @@ export default function CreateSession() {
               <button
                 type="button"
                 onClick={() => setIncludeWatched((v) => !v)}
-                className={`w-12 h-6 rounded-full transition-all relative ${
-                  includeWatched ? 'bg-amber-400' : 'bg-white/10'
-                }`}
+                className={`w-11 h-6 rounded-full transition-all relative shrink-0 ${includeWatched ? 'bg-amber-400' : 'bg-white/10'}`}
               >
-                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${
-                  includeWatched ? 'left-7' : 'left-1'
-                }`} />
+                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${includeWatched ? 'left-6' : 'left-1'}`} />
               </button>
             </div>
 
@@ -146,36 +153,21 @@ export default function CreateSession() {
             <div className="space-y-2">
               <label className="text-gray-400 text-sm">Gêneros</label>
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => toggleGenre('all')}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                    genres.includes('all')
-                      ? 'bg-amber-400 text-black'
-                      : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                  }`}
-                >
-                  Todos
-                </button>
+                <GenreChip label="Todos" active={genres.includes('all')} onClick={() => toggleGenre('all')} />
                 {ALL_GENRES.map((g) => (
-                  <button
+                  <GenreChip
                     key={g}
-                    type="button"
+                    label={g}
+                    active={genres.includes(g) && !genres.includes('all')}
                     onClick={() => toggleGenre(g)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                      genres.includes(g) && !genres.includes('all')
-                        ? 'bg-amber-400 text-black'
-                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                    }`}
-                  >
-                    {g}
-                  </button>
+                  />
                 ))}
               </div>
               {!genres.includes('all') && (
-                <p className="text-amber-400/70 text-xs">
-                  ⚠️ Filtrar por gênero requer buscar dados de cada filme (pode demorar)
-                </p>
+                <div className="flex items-start gap-1.5 text-amber-400/80 text-xs">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                  Filtrar por gênero busca dados de cada filme e pode demorar alguns segundos
+                </div>
               )}
             </div>
 
@@ -183,13 +175,28 @@ export default function CreateSession() {
 
             <button
               type="submit"
-              className="w-full py-4 rounded-2xl bg-amber-400 text-black font-bold text-lg hover:bg-amber-300 active:scale-95 transition-all shadow-lg shadow-amber-400/20"
+              className="w-full py-4 rounded-2xl bg-amber-400 text-black font-bold text-base flex items-center justify-center gap-2.5 hover:bg-amber-300 active:scale-95 transition-all shadow-lg shadow-amber-400/20"
             >
-              🎬 Criar sessão
+              <Clapperboard size={20} />
+              Criar sessão
             </button>
           </form>
         )}
       </motion.div>
     </div>
+  )
+}
+
+function GenreChip({ label, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+        active ? 'bg-amber-400 text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10'
+      }`}
+    >
+      {label}
+    </button>
   )
 }

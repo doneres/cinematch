@@ -5,6 +5,7 @@ import JoinSession from './pages/JoinSession'
 import Lobby from './pages/Lobby'
 import Swipe from './pages/Swipe'
 import Match from './pages/Match'
+import FilmManager from './pages/FilmManager'
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/lobby/:code" element={<Lobby />} />
         <Route path="/swipe/:code" element={<Swipe />} />
         <Route path="/match/:code" element={<Match />} />
+        <Route path="/films" element={<FilmManager />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </HashRouter>

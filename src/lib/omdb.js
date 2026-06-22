@@ -71,3 +71,16 @@ export async function fetchFilmList() {
   const res = await fetch('https://commitspammer.github.io/films.json')
   return res.json()
 }
+
+// Search films by title on OMDB
+export async function searchFilms(query) {
+  if (!query || query.length < 2) return []
+  try {
+    const res = await fetch(
+      `https://www.omdbapi.com/?s=${encodeURIComponent(query)}&type=movie&apikey=${API_KEY}`
+    )
+    const data = await res.json()
+    if (data.Response === 'True') return data.Search || []
+  } catch {}
+  return []
+}
