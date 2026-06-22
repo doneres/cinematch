@@ -9,6 +9,7 @@ import { getFilmDetails } from '../lib/omdb'
 import { getUserId, seededShuffle } from '../lib/utils'
 import { Users, Info, Film } from 'lucide-react'
 import PopcornBurst from '../components/PopcornBurst'
+import ChatDrawer from '../components/ChatDrawer'
 
 export default function Swipe() {
   const { code } = useParams()
@@ -143,6 +144,14 @@ export default function Swipe() {
       </p>
 
       <PopcornBurst active={popcorn} />
+
+      {session && (
+        <ChatDrawer
+          code={code}
+          userName={session.participants?.[userId]?.name || 'Anônimo'}
+          participants={session.participants}
+        />
+      )}
 
       {/* Film detail modal */}
       {detailFilm && (

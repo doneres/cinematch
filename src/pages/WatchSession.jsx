@@ -8,6 +8,7 @@ import ParticipantList from '../components/ParticipantList'
 import { subscribeToSession, startWatching, openReview } from '../lib/sessionService'
 import { getFilmDetails } from '../lib/omdb'
 import { getUserId } from '../lib/utils'
+import ChatDrawer from '../components/ChatDrawer'
 
 export default function WatchSession() {
   const { code } = useParams()
@@ -211,6 +212,14 @@ export default function WatchSession() {
           </div>
         )}
       </div>
+
+      {session && (
+        <ChatDrawer
+          code={code}
+          userName={session.participants?.[userId]?.name || 'Anônimo'}
+          participants={session.participants}
+        />
+      )}
     </div>
   )
 }

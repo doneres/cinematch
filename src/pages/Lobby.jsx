@@ -7,6 +7,7 @@ import SessionCode from '../components/SessionCode'
 import ParticipantList from '../components/ParticipantList'
 import { subscribeToSession, startSession } from '../lib/sessionService'
 import { getUserId } from '../lib/utils'
+import ChatDrawer from '../components/ChatDrawer'
 
 export default function Lobby() {
   const { code } = useParams()
@@ -112,6 +113,14 @@ export default function Lobby() {
           </div>
         )}
       </motion.div>
+
+      {session && (
+        <ChatDrawer
+          code={code}
+          userName={session.participants?.[userId]?.name || 'Anônimo'}
+          participants={session.participants}
+        />
+      )}
     </div>
   )
 }

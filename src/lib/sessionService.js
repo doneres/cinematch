@@ -6,6 +6,11 @@ import {
   onSnapshot,
   serverTimestamp,
   Timestamp,
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  limit,
 } from 'firebase/firestore'
 import { setWatched } from './filmStore'
 import { db } from './firebase'
@@ -153,6 +158,26 @@ export async function submitReview(code, userId, { rating, comment, userName, ma
       await setWatched(matchedFilmId, true).catch(() => {})
     }
   }
+}
+
+export function subscribeToMessages(code, callback) {
+  const q = query(
+    collection(db, 'sessions', code, 'messages'),
+    orderBy('createdAt', 'asc'),
+    limit(200)
+  )
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+  })
+}
+
+export async function sendMessage(code, userId, userName, text) {
+  await addDoc(collection(db, 'sessions', code, 'messages'), {
+    userId,
+    userName,
+    text: text.trim(),
+    createdAt: serverTimestamp(),
+  })
 }
 
 export function subscribeToSession(code, callback) {
