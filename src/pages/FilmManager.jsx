@@ -116,7 +116,7 @@ export default function FilmManager() {
   if (!unlocked) return <FilmManagerLock onUnlock={() => setUnlocked(true)} />
 
   return (
-    <div className="min-h-dvh bg-[#080810] flex flex-col">
+    <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-5 pb-3 border-b border-white/5 shrink-0">
         <div className="flex items-center gap-3">

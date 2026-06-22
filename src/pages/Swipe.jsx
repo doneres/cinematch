@@ -8,6 +8,7 @@ import { subscribeToSession, recordVote } from '../lib/sessionService'
 import { getFilmDetails } from '../lib/omdb'
 import { getUserId, seededShuffle } from '../lib/utils'
 import { Users, Info, Film } from 'lucide-react'
+import PopcornBurst from '../components/PopcornBurst'
 
 export default function Swipe() {
   const { code } = useParams()
@@ -20,6 +21,7 @@ export default function Swipe() {
   const [omdbCache, setOmdbCache] = useState({})
   const [done, setDone] = useState(false)
   const [detailFilm, setDetailFilm] = useState(null)
+  const [popcorn, setPopcorn] = useState(false)
 
   useEffect(() => {
     if (!code) return
@@ -51,6 +53,7 @@ export default function Swipe() {
   async function handleSwipe(direction) {
     const filmId = filmOrder[currentIndex]
     if (!filmId) return
+    if (direction === 'like') setPopcorn((v) => !v)
     try {
       const result = await recordVote({ code, userId, filmId, liked: direction === 'like' })
       if (result.matched) { navigate(`/match/${code}`); return }
@@ -138,6 +141,8 @@ export default function Swipe() {
       <p className="text-gray-700 text-xs text-center py-3 shrink-0">
         Arraste → curtir · ← passar · toque em <Info size={11} className="inline" /> para detalhes
       </p>
+
+      <PopcornBurst active={popcorn} />
 
       {/* Film detail modal */}
       {detailFilm && (
