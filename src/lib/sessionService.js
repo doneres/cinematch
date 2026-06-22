@@ -161,6 +161,12 @@ export async function submitReview(code, userId, { rating, comment, userName, ma
   }
 }
 
+export async function recordSuperLike(code, userId, userName, filmId) {
+  await updateDoc(doc(db, 'sessions', code), {
+    [`superLikes.${userId}`]: { filmId, userName, createdAt: serverTimestamp() },
+  })
+}
+
 export async function kickParticipant(code, userId) {
   // Only remove the participant — match logic already checks participants list,
   // so a kicked user's past votes won't count toward a match.

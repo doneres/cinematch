@@ -4,10 +4,12 @@ import { AnimatePresence, motion } from 'framer-motion'
 import SwipeCard from '../components/SwipeCard'
 import FilmDetailModal from '../components/FilmDetailModal'
 import Logo from '../components/Logo'
-import { subscribeToSession, recordVote, updateHeartbeat } from '../lib/sessionService'
+import {
+  subscribeToSession, recordVote, recordSuperLike, updateHeartbeat,
+} from '../lib/sessionService'
 import { getFilmDetails } from '../lib/omdb'
 import { getUserId, seededShuffle } from '../lib/utils'
-import { Users, Info, Film } from 'lucide-react'
+import { Users, Info, Film, Sparkles } from 'lucide-react'
 import PopcornBurst from '../components/PopcornBurst'
 import ChatDrawer from '../components/ChatDrawer'
 import HostControls from '../components/HostControls'
@@ -20,25 +22,31 @@ export default function Swipe() {
   const [session, setSession] = useState(null)
   const [filmOrder, setFilmOrder] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
+  const currentIndexRef = useRef(0)
   const [omdbCache, setOmdbCache] = useState({})
   const [done, setDone] = useState(false)
   const [detailFilm, setDetailFilm] = useState(null)
-  const [popcorn, setPopcorn] = useState(0)   // counter: increment on each like
-  const [swiping, setSwiping] = useState(false) // lock to prevent rapid clicks
+  const [popcorn, setPopcorn] = useState(0)
+  const [swiping, setSwiping] = useState(false)
   const [kicked, setKicked] = useState(false)
+  // Toast notification for incoming super likes
+  const [toast, setToast] = useState(null) // { fromName, filmTitle }
+  const toastTimerRef = useRef(null)
+  const processedSuperLikesRef = useRef(new Set())
   const heartbeatRef = useRef(null)
+
+  // Keep ref in sync for use inside setFilmOrder closures
+  useEffect(() => { currentIndexRef.current = currentIndex }, [currentIndex])
 
   useEffect(() => {
     if (!code) return
     const unsub = subscribeToSession(code, (data) => {
       setSession(data)
 
-      // Detect if we were kicked from the session
       if (data.participants && !data.participants[userId]) {
         setKicked(true)
         return
       }
-
       if (data.status === 'cancelled') { navigate('/'); return }
       if (data.status === 'completed' && data.matchedFilm) navigate(`/match/${code}`)
       if (data.status === 'watching') navigate(`/watch/${code}`)
@@ -47,7 +55,44 @@ export default function Swipe() {
     return unsub
   }, [code])
 
-  // Heartbeat: update lastSeen every 30s so host can detect inactive users
+  // React to incoming super likes from other participants
+  useEffect(() => {
+    if (!session?.superLikes || !filmOrder.length) return
+    const votes = session.votes || {}
+
+    Object.entries(session.superLikes).forEach(([fromUserId, sl]) => {
+      if (fromUserId === userId) return // ignore my own
+      const key = `${fromUserId}-${sl.filmId}`
+      if (processedSuperLikesRef.current.has(key)) return
+      processedSuperLikesRef.current.add(key)
+
+      const filmId = sl.filmId
+      const hasVoted = votes[filmId]?.[userId] !== undefined
+
+      if (!hasVoted) {
+        // Move the super liked film to be the next card
+        setFilmOrder((prev) => {
+          const ci = currentIndexRef.current
+          const pos = prev.indexOf(filmId)
+          const target = ci + 1
+          if (pos < 0 || pos <= ci || pos === target) return prev
+          const next = [...prev]
+          next.splice(pos, 1)
+          next.splice(target, 0, filmId)
+          return next
+        })
+
+        // Show toast
+        clearTimeout(toastTimerRef.current)
+        const fromName = session.participants?.[fromUserId]?.name || sl.userName
+        const filmTitle = omdbCache[filmId]?.Title || 'um filme'
+        setToast({ fromName, filmTitle })
+        toastTimerRef.current = setTimeout(() => setToast(null), 4000)
+      }
+    })
+  }, [session?.superLikes])
+
+  // Heartbeat: update lastSeen every 30s
   useEffect(() => {
     if (!code || !userId) return
     updateHeartbeat(code, userId).catch(() => {})
@@ -62,7 +107,7 @@ export default function Swipe() {
     setFilmOrder(seededShuffle(session.filmIds, userId))
   }, [session?.filmIds, userId])
 
-  // Preload current + next 2
+  // Preload current + next 3
   useEffect(() => {
     if (!filmOrder.length) return
     filmOrder.slice(currentIndex, currentIndex + 3).forEach(async (id) => {
@@ -89,11 +134,34 @@ export default function Swipe() {
     }
 
     const next = currentIndex + 1
-    if (next >= filmOrder.length) {
-      setDone(true)
-    } else {
-      setCurrentIndex(next)
+    if (next >= filmOrder.length) setDone(true)
+    else setCurrentIndex(next)
+    setSwiping(false)
+  }
+
+  async function handleSuperLike() {
+    if (swiping) return
+    const filmId = filmOrder[currentIndex]
+    if (!filmId) return
+
+    setSwiping(true)
+    const myName = session?.participants?.[userId]?.name || 'Alguém'
+
+    // Also register as a like vote
+    try {
+      await recordSuperLike(code, userId, myName, filmId)
+      const result = await recordVote({ code, userId, filmId, liked: true })
+      if (result.matched) { navigate(`/match/${code}`); return }
+    } catch (err) {
+      console.error(err)
     }
+
+    // Popcorn burst for super like too
+    setPopcorn((n) => n + 1)
+
+    const next = currentIndex + 1
+    if (next >= filmOrder.length) setDone(true)
+    else setCurrentIndex(next)
     setSwiping(false)
   }
 
@@ -103,7 +171,17 @@ export default function Swipe() {
   const participantCount = Object.keys(session?.participants || {}).length
   const progress = filmOrder.length > 0 ? (currentIndex / filmOrder.length) * 100 : 0
 
-  // Kicked screen
+  // Check if current film has been super liked by someone else
+  const superLikedBy = (() => {
+    if (!currentFilmId || !session?.superLikes) return null
+    const entry = Object.entries(session.superLikes).find(
+      ([fromId, sl]) => fromId !== userId && sl.filmId === currentFilmId
+    )
+    if (!entry) return null
+    const [fromId, sl] = entry
+    return session.participants?.[fromId]?.name || sl.userName
+  })()
+
   if (kicked) {
     return (
       <div className="page-swipe items-center justify-center px-4 gap-4 bg-[#080810]">
@@ -143,8 +221,7 @@ export default function Swipe() {
           <div className="flex items-center gap-3 text-right">
             <span className="text-gray-500 text-xs">{currentIndex + 1}/{filmOrder.length}</span>
             <span className="flex items-center gap-1 text-gray-500 text-xs">
-              <Users size={12} />
-              {participantCount}
+              <Users size={12} />{participantCount}
             </span>
           </div>
         </div>
@@ -156,6 +233,21 @@ export default function Swipe() {
             style={{ width: `${progress}%` }}
           />
         </div>
+
+        {/* Super like toast */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: -12, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.95 }}
+              className="mx-auto mb-2 shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-400/15 border border-amber-400/30 text-amber-300 text-xs font-medium max-w-xs"
+            >
+              <Sparkles size={14} className="text-amber-400 shrink-0" />
+              <span><span className="text-amber-400 font-bold">{toast.fromName}</span> recomendou <span className="font-bold">"{toast.filmTitle}"</span> — próximo!</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Card area */}
         <div className="flex-1 min-h-0 flex flex-col items-center justify-center relative">
@@ -178,8 +270,10 @@ export default function Swipe() {
                   film={{ id: currentFilmId, name: currentOmdb?.Title || '', rating: 0 }}
                   omdbData={currentOmdb}
                   onSwipe={handleSwipe}
+                  onSuperLike={handleSuperLike}
                   disabled={swiping}
                   isTop={true}
+                  superLikedBy={superLikedBy}
                   onDetail={() => setDetailFilm({ id: currentFilmId, omdb: currentOmdb })}
                 />
               </motion.div>
@@ -188,11 +282,10 @@ export default function Swipe() {
         </div>
 
         {/* Hint */}
-        <p className="text-gray-700 text-xs text-center py-3 shrink-0">
-          Arraste → curtir · ← passar · toque em <Info size={11} className="inline" /> para detalhes
+        <p className="text-gray-700 text-xs text-center py-2 shrink-0">
+          → curtir · ← passar · ↑ super like · <Info size={11} className="inline" /> detalhes
         </p>
 
-        {/* Film detail modal inside page-swipe (it manages its own fixed overlay) */}
         {detailFilm && (
           <FilmDetailModal
             omdbData={detailFilm.omdb}
@@ -203,15 +296,10 @@ export default function Swipe() {
         )}
       </div>
 
-      {/* These live outside page-swipe so they're not clipped by overflow:hidden */}
       <PopcornBurst active={popcorn} />
       {session && (
         <>
-          <HostControls
-            code={code}
-            session={session}
-            onCancelled={() => navigate('/')}
-          />
+          <HostControls code={code} session={session} onCancelled={() => navigate('/')} />
           <ChatDrawer
             code={code}
             userName={session.participants?.[userId]?.name || 'Anônimo'}
