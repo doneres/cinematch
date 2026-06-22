@@ -68,14 +68,14 @@ export default function Review() {
 
   if (!session) {
     return (
-      <div className="min-h-dvh bg-[#080810] flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center">
         <Loader2 size={28} className="text-amber-400 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-dvh bg-[#080810] flex flex-col px-4 py-6">
+    <div className="flex-1 flex flex-col px-4 py-6 overflow-y-auto">
       <div className="flex items-center justify-between mb-4">
         <Logo size="sm" />
         {isFinished && (

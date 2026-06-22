@@ -12,19 +12,21 @@ import Review from './pages/Review'
 export default function App() {
   return (
     <HashRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/create" element={<CreateSession />} />
-        <Route path="/join" element={<JoinSession />} />
-        <Route path="/join/:code" element={<JoinSession />} />
-        <Route path="/lobby/:code" element={<Lobby />} />
-        <Route path="/swipe/:code" element={<Swipe />} />
-        <Route path="/match/:code" element={<Match />} />
-        <Route path="/watch/:code" element={<WatchSession />} />
-        <Route path="/review/:code" element={<Review />} />
-        <Route path="/films" element={<FilmManager />} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+      <div className="app-shell">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/create" element={<CreateSession />} />
+          <Route path="/join" element={<JoinSession />} />
+          <Route path="/join/:code" element={<JoinSession />} />
+          <Route path="/lobby/:code" element={<Lobby />} />
+          <Route path="/swipe/:code" element={<Swipe />} />
+          <Route path="/match/:code" element={<Match />} />
+          <Route path="/watch/:code" element={<WatchSession />} />
+          <Route path="/review/:code" element={<Review />} />
+          <Route path="/films" element={<FilmManager />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </div>
     </HashRouter>
   )
 }

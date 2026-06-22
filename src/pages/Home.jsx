@@ -7,7 +7,7 @@ export default function Home() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-dvh bg-[#080810] flex flex-col items-center justify-center px-4 relative overflow-hidden">
+    <div className="flex-1 flex flex-col items-center justify-center px-4 relative overflow-hidden">
       {/* Ambient glow */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 left-1/4 w-64 h-64 bg-purple-800/5 rounded-full blur-3xl pointer-events-none" />

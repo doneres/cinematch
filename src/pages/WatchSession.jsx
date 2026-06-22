@@ -92,7 +92,7 @@ export default function WatchSession() {
   const progress = totalSecs > 0 ? Math.max(0, 1 - remaining / totalSecs) : 0
 
   return (
-    <div className="min-h-dvh bg-[#080810] flex flex-col px-4 py-6">
+    <div className="flex-1 flex flex-col px-4 py-6 overflow-y-auto">
       <div className="flex items-center justify-between mb-6">
         <Logo size="sm" />
         <span className="text-gray-600 text-xs uppercase tracking-wider">Sessão {code}</span>

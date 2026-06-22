@@ -36,7 +36,7 @@ export default function Match() {
 
   if (loading || !session) {
     return (
-      <div className="min-h-dvh bg-[#080810] flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center">
         <Loader2 size={28} className="text-amber-400 animate-spin" />
       </div>
     )
@@ -49,7 +49,7 @@ export default function Match() {
   const isHost = session.hostId === userId
 
   return (
-    <div className="min-h-dvh bg-[#080810] flex flex-col items-center px-4 py-8 overflow-hidden">
+    <div className="flex-1 flex flex-col items-center px-4 py-8 overflow-y-auto">
       {/* Confetti */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         {Array.from({ length: 18 }).map((_, i) => (

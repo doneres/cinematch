@@ -31,7 +31,7 @@ export default function JoinSession() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#080810] flex flex-col px-4 py-6">
+    <div className="flex-1 flex flex-col px-4 py-6 overflow-y-auto">
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => navigate('/')}

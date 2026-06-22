@@ -6,39 +6,59 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html {
-  height: 100%;
-  overflow: hidden;
-}
-
-body {
+html, body {
   height: 100%;
   margin: 0;
   padding: 0;
   font-family: 'Inter', system-ui, sans-serif;
-  background: #080810;
+  background: #040408;
   color: #f3f4f6;
   overscroll-behavior: none;
-  overflow: hidden;
 }
 
 #root {
-  height: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Cinema side bars on wide screens */
+  background:
+    linear-gradient(to right, #040408 0%, #040408 100%);
+}
+
+/* The actual app shell — phone-width on desktop */
+.app-shell {
+  width: 100%;
+  max-width: 480px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #080810;
+  position: relative;
+}
+
+/* Desktop: subtle border + shadow to frame the app */
+@media (min-width: 640px) {
+  #root {
+    background: #040408;
+    padding: 0;
+  }
+  .app-shell {
+    min-height: 100dvh;
+    box-shadow: 0 0 80px rgba(245,193,24,0.04), 0 0 0 1px rgba(255,255,255,0.04);
+  }
+}
+
+/* Swipe page fills exact viewport height without scroll */
+.page-swipe {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   height: 100dvh;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
 }
 
 .select-none {
   -webkit-user-select: none;
   user-select: none;
-}
-
-/* Swipe page — fills exact viewport, no scroll */
-.page-swipe {
-  height: 100dvh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
 }
