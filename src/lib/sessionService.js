@@ -162,9 +162,10 @@ export async function submitReview(code, userId, { rating, comment, userName, ma
 }
 
 export async function kickParticipant(code, userId) {
+  // Only remove the participant — match logic already checks participants list,
+  // so a kicked user's past votes won't count toward a match.
   await updateDoc(doc(db, 'sessions', code), {
     [`participants.${userId}`]: deleteField(),
-    [`votes`]: deleteField(), // reset votes to avoid match with ghost participants
   })
 }
 

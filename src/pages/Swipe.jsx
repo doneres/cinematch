@@ -10,6 +10,7 @@ import { getUserId, seededShuffle } from '../lib/utils'
 import { Users, Info, Film } from 'lucide-react'
 import PopcornBurst from '../components/PopcornBurst'
 import ChatDrawer from '../components/ChatDrawer'
+import HostControls from '../components/HostControls'
 
 export default function Swipe() {
   const { code } = useParams()
@@ -205,11 +206,18 @@ export default function Swipe() {
       {/* These live outside page-swipe so they're not clipped by overflow:hidden */}
       <PopcornBurst active={popcorn} />
       {session && (
-        <ChatDrawer
-          code={code}
-          userName={session.participants?.[userId]?.name || 'Anônimo'}
-          participants={session.participants}
-        />
+        <>
+          <HostControls
+            code={code}
+            session={session}
+            onCancelled={() => navigate('/')}
+          />
+          <ChatDrawer
+            code={code}
+            userName={session.participants?.[userId]?.name || 'Anônimo'}
+            participants={session.participants}
+          />
+        </>
       )}
     </>
   )
